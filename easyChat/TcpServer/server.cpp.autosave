@@ -1,0 +1,50 @@
+#include "server.h"
+
+Server::Server(QObject *parent,int port)
+    :QTcpServer(parent)
+{
+    listen(QHostAddress::Any,port);
+}
+int i =0;
+//每次只要有一个客服端连接就会调用 
+void Server::incomingConnection(qintptr socketDescriptor)
+{
+    //创建一个新的客服端流
+    TcpClientSocket *tcpClientSocket=new TcpClientSocket(this);
+    connect(tcpClientSocket,SIGNAL(updateClients(QString,int)),this,SLOT(updateClients(QString,int)));
+    connect(tcpClientSocket,SIGNAL(disconnected(int)),this,SLOT(slotDisconnected(int)));
+
+    tcpClientSocket->setSocketDescriptor(socketDescriptor);
+
+    tcpClientSocketList.append(tcpClientSocket);
+    qDebug()<<i;
+    i++;
+}
+
+void Server::updateClients(QString msg,int length)
+{
+    emit updateServer(msg,length);
+    //这里是往每个链接里与 
+    for(int i=0;i<tcpClientSocketList.count();i++)
+    {
+        QTcpSocket *item = tcpClientSocketList.at(i);
+        if(item->write(msg.toLatin1(),length)!=length)
+        {
+            continue;
+        }
+    }
+}
+
+void Server::slotDisconnected(int descriptor)
+{
+    for(int i=0;i<tcpClientSocketList.count();i++)
+    {
+        QTcpSocket *item = tcpClientSocketList.at(i);
+        if(item->socketDescriptor()==descriptor)
+        {
+            tcpClientSocketList.removeAt(i);
+            return;
+        }
+    }
+    return;
+}
